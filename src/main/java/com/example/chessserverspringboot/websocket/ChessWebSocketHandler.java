@@ -30,27 +30,27 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
         MessageModel msg = mapper.readValue(message.getPayload(), MessageModel.class);
 
         switch (msg.getType()) {
-            case "CONNECT" -> {
-                Player player = new Player(msg.getSender(), session);
-                GameSession game = matchmaker.addPlayer(player);
-
-                if (game == null) {
-                    session.sendMessage(new TextMessage(
-                            mapper.writeValueAsString(new MessageModel("WAIT", "SERVER", "Ожидание второго игрока..."))
-                    ));
-                } else {
-                    // Оповещаем обоих игроков
-                    String startInfo = String.format("white=%s, black=%s",
-                            game.getWhite().getName(), game.getBlack().getName());
-
-                    game.getWhite().getSession().sendMessage(new TextMessage(
-                            mapper.writeValueAsString(new MessageModel("START", "SERVER", startInfo))
-                    ));
-                    game.getBlack().getSession().sendMessage(new TextMessage(
-                            mapper.writeValueAsString(new MessageModel("START", "SERVER", startInfo))
-                    ));
-                }
-            }
+//            case "CONNECT" -> {
+//                Player player = new Player(msg.getSender(), session);
+//                GameSession game = matchmaker.addPlayer(player);
+//
+//                if (game == null) {
+//                    session.sendMessage(new TextMessage(
+//                            mapper.writeValueAsString(new MessageModel("WAIT", "SERVER", "Ожидание второго игрока..."))
+//                    ));
+//                } else {
+//                    // Оповещаем обоих игроков
+//                    String startInfo = String.format("white=%s, black=%s",
+//                            game.getWhite().getName(), game.getBlack().getName());
+//
+//                    game.getWhite().getSession().sendMessage(new TextMessage(
+//                            mapper.writeValueAsString(new MessageModel("START", "SERVER", startInfo))
+//                    ));
+//                    game.getBlack().getSession().sendMessage(new TextMessage(
+//                            mapper.writeValueAsString(new MessageModel("START", "SERVER", startInfo))
+//                    ));
+//                }
+//            }
 
             case "MOVE" -> {
                 GameSession game = matchmaker.getGameByPlayer(msg.getSender());
@@ -80,38 +80,43 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
             }
 
             case "CREATE_ROOM" -> {
-                int minutes = Integer.parseInt(msg.getContent());
+                String[] parts = msg.getContent().split("\\|");
+                int minutes = Integer.parseInt(parts[0]);
+                int increment = (parts.length > 1) ? Integer.parseInt(parts[1]) : 0;
+
                 Player player = new Player(msg.getSender(), session);
-                matchmaker.createRoom(player, minutes);
+                matchmaker.createRoom(player, minutes, increment);
 
                 session.sendMessage(new TextMessage(mapper.writeValueAsString(
                         new MessageModel("WAIT", "SERVER",
-                                "Комната создана (" + minutes + " мин). Ожидание соперника..."))
+                                "Комната создана (" + minutes + "|" + increment + " мин). Ожидание соперника..."))
                 ));
             }
 
             case "JOIN_ROOM" -> {
-                int minutes = Integer.parseInt(msg.getContent());
+                String[] parts = msg.getContent().split("\\|");
+                int minutes = Integer.parseInt(parts[0]);
+                int increment = (parts.length > 1) ? Integer.parseInt(parts[1]) : 0;
+
                 Player player = new Player(msg.getSender(), session);
-                var game = matchmaker.joinRoom(player, minutes);
+                var game = matchmaker.joinRoom(player, minutes, increment);
 
                 if (game == null) {
                     session.sendMessage(new TextMessage(mapper.writeValueAsString(
                             new MessageModel("WAIT", "SERVER",
-                                    "Ожидание комнаты с " + minutes + " мин..."))
+                                    "Ожидание комнаты с " + minutes + "|" + increment + " мин..."))
                     ));
                 } else {
-                    String startInfo = String.format("white=%s, black=%s, time=%d мин",
-                            game.getWhite().getName(), game.getBlack().getName(), minutes);
-
+                    String startInfo = String.format("white=%s, black=%s, time=%d|%d мин",
+                            game.getWhite().getName(), game.getBlack().getName(), minutes, increment);
                     game.getWhite().getSession().sendMessage(new TextMessage(mapper.writeValueAsString(
-                            new MessageModel("START", "SERVER", startInfo))
-                    ));
+                            new MessageModel("START", "SERVER", startInfo))));
                     game.getBlack().getSession().sendMessage(new TextMessage(mapper.writeValueAsString(
-                            new MessageModel("START", "SERVER", startInfo))
-                    ));
+                            new MessageModel("START", "SERVER", startInfo))));
                 }
             }
+
+
 
             case "ROOMS" -> {
                 var rooms = matchmaker.getAvailableRooms();
