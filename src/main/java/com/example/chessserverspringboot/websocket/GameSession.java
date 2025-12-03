@@ -9,6 +9,10 @@ public class GameSession {
     private final Player black;
     private final GameState state;
     private final GameTimer timer;
+    private int matchId;
+
+    public void setMatchId(int id) { this.matchId = id; }
+    public int getMatchId() { return matchId; }
 
     public GameSession(Player white, Player black, int minutes, int increment) {
         this.white = white;
