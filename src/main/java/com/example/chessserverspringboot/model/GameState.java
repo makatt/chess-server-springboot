@@ -4,6 +4,10 @@ public class GameState {
 
     private Piece[][] board = new Piece[8][8];
     private String currentTurn = "white";
+    private boolean whiteToMove = true;
+
+    public boolean isWhiteToMove() { return whiteToMove; }
+    public void switchTurn() { whiteToMove = !whiteToMove; }
 
     public GameState() { setupBoard(); }
 
@@ -26,6 +30,49 @@ public class GameState {
 
     public String getCurrentTurn() { return currentTurn; }
     public Piece[][] getBoard() { return board; }
+
+    public String toFEN() {
+        StringBuilder sb = new StringBuilder();
+
+        for (int r = 0; r < 8; r++) {
+            int empty = 0;
+            for (int c = 0; c < 8; c++) {
+                Piece p = board[r][c];
+                if (p == null) {
+                    empty++;
+                } else {
+                    if (empty > 0) {
+                        sb.append(empty);
+                        empty = 0;
+                    }
+                    sb.append(pieceToFenChar(p));
+                }
+            }
+            if (empty > 0) sb.append(empty);
+            if (r < 7) sb.append('/');
+        }
+
+        sb.append(' ')
+                .append(isWhiteToMove() ? "w" : "b")
+                .append(" - - 0 1");
+
+        return sb.toString();
+    }
+
+
+    private char pieceToFenChar(Piece p) {
+        char ch = switch (p.getType()) {
+            case "pawn" -> 'p';
+            case "rook" -> 'r';
+            case "knight" -> 'n';
+            case "bishop" -> 'b';
+            case "queen" -> 'q';
+            case "king" -> 'k';
+            default -> '?';
+        };
+        return p.getColor().equals("white") ? Character.toUpperCase(ch) : ch;
+    }
+
 
     /** Возвращает результат попытки сделать ход */
     public String makeMove(String from, String to) {
@@ -60,6 +107,7 @@ public class GameState {
             if (!hasLegalMoves(enemy)) return "CHECKMATE";
             return "CHECK";
         }
+        whiteToMove = !whiteToMove;
         return "OK";
     }
 

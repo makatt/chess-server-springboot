@@ -2,6 +2,7 @@ package com.example.chessserverspringboot.service;
 
 import com.example.chessserverspringboot.websocket.GameSession;
 import com.example.chessserverspringboot.websocket.Player;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -9,11 +10,11 @@ import java.util.*;
 @Service
 public class MatchmakerService {
 
-    // Очередь ожидания по ключу времени: "3|2", "5|0", "10|0"
     private final Map<String, Queue<Player>> waitingRooms = new HashMap<>();
-
-    // Активные игры
     private final Map<String, GameSession> activeGames = new HashMap<>();
+
+    @Autowired
+    private GameDatabaseService gameDB;
 
     /** Создание комнаты */
     public synchronized void createRoom(Player player, int minutes, int increment) {
@@ -33,18 +34,34 @@ public class MatchmakerService {
             opponent.setColor("white");
             player.setColor("black");
 
-            GameSession session = new GameSession(opponent, player, minutes, increment);
+            //    конструктор из GameSession
+            GameSession session = new GameSession(
+                    opponent,
+                    player,
+                    minutes,
+                    increment,
+                    gameDB
+            );
+
+            int matchId = gameDB.createMatch(
+                    Integer.parseInt(opponent.getName()),
+                    Integer.parseInt(player.getName())
+            );
+            session.setMatchId(matchId);
+
             activeGames.put(opponent.getName(), session);
             activeGames.put(player.getName(), session);
+
             return session;
+
         } else {
-            // если никого нет — создать новую комнату
             createRoom(player, minutes, increment);
             return null;
         }
     }
 
-    /** Получение списка комнат */
+
+    /** 🔥 Получение списка доступных комнат */
     public synchronized Map<String, Integer> getAvailableRooms() {
         Map<String, Integer> summary = new LinkedHashMap<>();
         for (var entry : waitingRooms.entrySet()) {
@@ -53,14 +70,8 @@ public class MatchmakerService {
         return summary;
     }
 
+    /** 🔥 Получение активной игры по ID игрока */
     public GameSession getGameByPlayer(String playerName) {
         return activeGames.get(playerName);
-    }
-
-    public void removePlayer(String playerName) {
-        activeGames.remove(playerName);
-        for (Queue<Player> q : waitingRooms.values()) {
-            q.removeIf(p -> p.getName().equals(playerName));
-        }
     }
 }
