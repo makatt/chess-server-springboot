@@ -30,6 +30,7 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
         System.out.println("✅ Игрок подключился: " + session.getId());
     }
 
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
 
@@ -37,9 +38,9 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
 
         switch (msg.getType()) {
 
-            // ===========================
-            //   ИГРОВОЙ ХОД
-            // ===========================
+            // ==================================================
+            //                      MOVE
+            // ==================================================
             case "MOVE" -> {
                 GameSession game = matchmaker.getGameByPlayer(msg.getSender());
                 if (game != null) {
@@ -47,13 +48,16 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
                     String[] move = msg.getContent().split("-");
                     String result = game.getState().makeMove(move[0], move[1]);
 
-                    // === Сохранить ход в БД ===
+                    // FEN после хода
+                    String fen = game.getState().toFEN();
+
+                    // Сохранение хода
                     gameDB.saveMove(
                             game.getMatchId(),
                             Integer.parseInt(msg.getSender()),
-                            0,                  // пока без счётчика ходов
-                            msg.getContent(),   // например: "e2-e4"
-                            null                // пока без FEN
+                            0,                      // moveNumber можно позже добавить
+                            msg.getContent(),
+                            fen
                     );
 
                     if (result.equals("OK") || result.equals("CHECK")) {
@@ -62,44 +66,49 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
                             game.getTimer().switchTurn();
 
                         String newState = mapper.writeValueAsString(game.getState());
+
                         broadcastToGame(game, new MessageModel("UPDATE", "SERVER", newState));
 
                         if (result.equals("CHECK")) {
-                            broadcastToGame(game, new MessageModel("CHECK", "SERVER", "Король под шахом!"));
+                            broadcastToGame(game,
+                                    new MessageModel("CHECK", "SERVER", "Король под шахом!")
+                            );
                         }
 
                     } else if (result.equals("CHECKMATE")) {
 
-                        broadcastToGame(game, new MessageModel("CHECKMATE", "SERVER", "Мат! Игра окончена."));
+                        broadcastToGame(game,
+                                new MessageModel("CHECKMATE", "SERVER", "Мат! Игра окончена.")
+                        );
+
+                        int winnerId = Integer.parseInt(msg.getSender());
+                        String finalFen = game.getState().toFEN();
+
+                        gameDB.finishMatch(game.getMatchId(), winnerId, finalFen, "checkmate");
+
                         if (game.getTimer() != null)
                             game.getTimer().stop();
 
-                        // === Сохранить результат ===
-                        gameDB.finishMatch(
-                                game.getMatchId(),
-                                Integer.parseInt(msg.getSender()),
-                                null,
-                                "checkmate"
-                        );
-
                     } else {
+
                         session.sendMessage(new TextMessage(
-                                mapper.writeValueAsString(
-                                        new MessageModel("ERROR", "SERVER", "Неверный ход или не ваш ход")
-                                )));
+                                mapper.writeValueAsString(new MessageModel(
+                                        "ERROR",
+                                        "SERVER",
+                                        "Неверный ход или не ваш ход"
+                                ))
+                        ));
                     }
                 }
             }
 
-            // ===========================
-            //   СОЗДАНИЕ КОМНАТЫ
-            // ===========================
+            // ==================================================
+            //                  CREATE ROOM
+            // ==================================================
             case "CREATE_ROOM" -> {
                 String[] parts = msg.getContent().split("\\|");
                 int minutes = Integer.parseInt(parts[0]);
-                int increment = (parts.length > 1)
-                        ? Integer.parseInt(parts[1])
-                        : 0;
+                int increment = (parts.length > 1 ? Integer.parseInt(parts[1]) : 0);
 
                 Player player = new Player(msg.getSender(), session);
                 matchmaker.createRoom(player, minutes, increment);
@@ -108,31 +117,32 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
                         mapper.writeValueAsString(
                                 new MessageModel("WAIT", "SERVER",
                                         "Комната создана (" + minutes + "|" + increment + "). Ожидание соперника...")
-                        )));
+                        )
+                ));
             }
 
-            // ===========================
-            //   ПОДКЛЮЧЕНИЕ К КОМНАТЕ
-            // ===========================
+            // ==================================================
+            //                    JOIN ROOM
+            // ==================================================
             case "JOIN_ROOM" -> {
                 String[] parts = msg.getContent().split("\\|");
                 int minutes = Integer.parseInt(parts[0]);
-                int increment = (parts.length > 1)
-                        ? Integer.parseInt(parts[1])
-                        : 0;
+                int increment = (parts.length > 1 ? Integer.parseInt(parts[1]) : 0);
 
                 Player player = new Player(msg.getSender(), session);
                 GameSession game = matchmaker.joinRoom(player, minutes, increment);
 
                 if (game == null) {
+
                     session.sendMessage(new TextMessage(
                             mapper.writeValueAsString(
                                     new MessageModel("WAIT", "SERVER",
                                             "Ожидание комнаты " + minutes + "|" + increment)
-                            )));
+                            )
+                    ));
+
                 } else {
 
-                    // Сообщаем игрокам о старте
                     String startInfo = String.format(
                             "white=%s, black=%s, time=%d|%d",
                             game.getWhite().getName(),
@@ -145,27 +155,37 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
                 }
             }
 
-            // ===========================
-            //   СПИСОК КОМНАТ
-            // ===========================
+            // ==================================================
+            //                  GET ROOMS
+            // ==================================================
             case "ROOMS" -> {
+
                 var rooms = matchmaker.getAvailableRooms();
                 String json = mapper.writeValueAsString(rooms);
+
                 session.sendMessage(new TextMessage(
                         mapper.writeValueAsString(
                                 new MessageModel("ROOMS", "SERVER", json)
-                        )));
+                        )
+                ));
             }
 
-            default ->
-                    session.sendMessage(new TextMessage("❌ Неизвестный тип сообщения"));
+
+            // ==================================================
+            //                     DEFAULT
+            // ==================================================
+            default -> {
+                session.sendMessage(new TextMessage("❌ Неизвестный тип сообщения"));
+            }
         }
     }
+
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         sessions.remove(session.getId());
     }
+
 
     private void broadcastToGame(GameSession game, MessageModel msg) throws Exception {
         String json = mapper.writeValueAsString(msg);

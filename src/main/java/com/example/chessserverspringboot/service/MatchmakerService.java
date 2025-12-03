@@ -34,7 +34,14 @@ public class MatchmakerService {
             opponent.setColor("white");
             player.setColor("black");
 
-            GameSession session = new GameSession(opponent, player, minutes, increment);
+            //    конструктор из GameSession
+            GameSession session = new GameSession(
+                    opponent,
+                    player,
+                    minutes,
+                    increment,
+                    gameDB
+            );
 
             int matchId = gameDB.createMatch(
                     Integer.parseInt(opponent.getName()),
@@ -46,11 +53,13 @@ public class MatchmakerService {
             activeGames.put(player.getName(), session);
 
             return session;
+
         } else {
             createRoom(player, minutes, increment);
             return null;
         }
     }
+
 
     /** 🔥 Получение списка доступных комнат */
     public synchronized Map<String, Integer> getAvailableRooms() {

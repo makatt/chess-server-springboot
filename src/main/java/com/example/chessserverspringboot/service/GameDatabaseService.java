@@ -5,6 +5,7 @@ import com.example.chessserverspringboot.Entity.MatchMove;
 import com.example.chessserverspringboot.Repository.MatchRepository;
 import com.example.chessserverspringboot.Repository.MatchMovesRepository;
 import com.example.chessserverspringboot.model.MoveJson;
+import com.example.chessserverspringboot.websocket.GameSession;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,10 +68,16 @@ public class GameDatabaseService {
 
     public void finishMatch(int matchId, int winnerId, String fen, String reason) {
         Match m = matchRepo.findById(matchId).orElseThrow();
-        m.setWinner_id(winnerId);
-        m.setEnd_reason(reason);
-        m.setFinal_fen(fen);
-        m.setEnded_at(LocalDateTime.now());
+
+        m.setWinner_id(winnerId);      // победитель
+        m.setEnd_reason(reason);       // причина завершения
+        m.setFinal_fen(fen);           // итоговая позиция
+        m.setEnded_at(LocalDateTime.now()); // время завершения
+        // started_at уже стоит в конструкторе Match
+
         matchRepo.save(m);
     }
+
+
+
 }
