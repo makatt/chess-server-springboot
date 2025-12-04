@@ -4,7 +4,6 @@ import com.example.chessserverspringboot.Entity.Match;
 import com.example.chessserverspringboot.Entity.MatchMove;
 import com.example.chessserverspringboot.Repository.MatchRepository;
 import com.example.chessserverspringboot.Repository.MatchMovesRepository;
-import com.example.chessserverspringboot.model.MoveJson;
 import com.example.chessserverspringboot.websocket.GameSession;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -73,7 +72,7 @@ public class GameDatabaseService {
         m.setEnd_reason(reason);       // причина завершения
         m.setFinal_fen(fen);           // итоговая позиция
         m.setEnded_at(LocalDateTime.now()); // время завершения
-        // started_at уже стоит в конструкторе Match
+
 
         matchRepo.save(m);
     }

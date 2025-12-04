@@ -22,26 +22,26 @@ public class MatchController {
         this.movesRepo = movesRepo;
     }
 
-    /** 1️⃣ Все матчи игрока */
+    // Все матчи игрока 
     @GetMapping("/player/{playerId}")
     public List<Match> getMatchesByPlayer(@PathVariable int playerId) {
         return matchRepo.findByPlayer(playerId);
     }
 
-    /** 2️⃣ Ходы конкретного матча */
+    // Ходы конкретного матча
     @GetMapping("/{matchId}/moves")
     public List<MatchMove> getMatchMoves(@PathVariable int matchId) {
         return movesRepo.findByMatchId(matchId);
     }
 
-    /** 3️⃣ Полная информация о матче */
+    // Полная информация о матче
     @GetMapping("/{matchId}")
     public Match getMatchInfo(@PathVariable int matchId) {
         return matchRepo.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Match not found"));
     }
 
-    /** 4️⃣ Статистика игрока */
+    // Статистика игрока
     @GetMapping("/player/{playerId}/stats")
     public PlayerStats getPlayerStats(@PathVariable int playerId) {
         int total = matchRepo.countByPlayer(playerId);

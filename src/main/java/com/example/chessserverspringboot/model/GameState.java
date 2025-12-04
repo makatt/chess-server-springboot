@@ -74,7 +74,7 @@ public class GameState {
     }
 
 
-    /** Возвращает результат попытки сделать ход */
+    // Возвращает результат попытки сделать ход
     public String makeMove(String from, String to) {
         Position f = Position.fromAlgebraic(from);
         Position t = Position.fromAlgebraic(to);
@@ -169,7 +169,7 @@ public class GameState {
         return false;
     }
 
-    // ---------- Проверки типов фигур (из прошлой версии) ----------
+    // ---------- Проверки типов фигур прошля версия ----------
     private boolean isValidMove(Piece piece, Position from, Position to) {
         int dr = to.getRow() - from.getRow();
         int dc = to.getCol() - from.getCol();

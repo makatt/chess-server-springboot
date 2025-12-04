@@ -42,7 +42,7 @@ public class GameTimer {
         long elapsed = now - lastMoveTime;
         if (activeColor.equals("white")) {
             whiteTimeMs -= elapsed;
-            whiteTimeMs += incrementSec * 1000L; // ➕ добавляем инкремент
+            whiteTimeMs += incrementSec * 1000L; // добавляем инкремент
         } else {
             blackTimeMs -= elapsed;
             blackTimeMs += incrementSec * 1000L;

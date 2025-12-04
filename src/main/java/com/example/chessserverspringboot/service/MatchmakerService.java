@@ -16,14 +16,14 @@ public class MatchmakerService {
     @Autowired
     private GameDatabaseService gameDB;
 
-    /** Создание комнаты */
+    //Создание комнаты
     public synchronized void createRoom(Player player, int minutes, int increment) {
         String key = minutes + "|" + increment;
         waitingRooms.putIfAbsent(key, new LinkedList<>());
         waitingRooms.get(key).add(player);
     }
 
-    /** Присоединение к комнате */
+    // Присоединение к комнате
     public synchronized GameSession joinRoom(Player player, int minutes, int increment) {
         String key = minutes + "|" + increment;
         Queue<Player> queue = waitingRooms.get(key);
@@ -61,7 +61,7 @@ public class MatchmakerService {
     }
 
 
-    /** 🔥 Получение списка доступных комнат */
+    // Получение списка доступных комнат
     public synchronized Map<String, Integer> getAvailableRooms() {
         Map<String, Integer> summary = new LinkedHashMap<>();
         for (var entry : waitingRooms.entrySet()) {
@@ -70,7 +70,7 @@ public class MatchmakerService {
         return summary;
     }
 
-    /** 🔥 Получение активной игры по ID игрока */
+    // Получение активной игры по ID игрока
     public GameSession getGameByPlayer(String playerName) {
         return activeGames.get(playerName);
     }

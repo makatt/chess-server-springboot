@@ -27,7 +27,7 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.put(session.getId(), session);
-        System.out.println("✅ Игрок подключился: " + session.getId());
+        System.out.println(" Игрок подключился: " + session.getId());
     }
 
 
@@ -175,7 +175,7 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
             //                     DEFAULT
             // ==================================================
             default -> {
-                session.sendMessage(new TextMessage("❌ Неизвестный тип сообщения"));
+                session.sendMessage(new TextMessage(" Неизвестный тип сообщения"));
             }
         }
     }
