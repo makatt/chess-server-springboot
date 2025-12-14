@@ -2,6 +2,8 @@ package com.example.chessserverspringboot.service;
 
 import com.example.chessserverspringboot.Entity.Match;
 import com.example.chessserverspringboot.Entity.MatchMove;
+import com.example.chessserverspringboot.Registration.UserProfile;
+import com.example.chessserverspringboot.Registration.UserProfileRepository;
 import com.example.chessserverspringboot.Repository.MatchRepository;
 import com.example.chessserverspringboot.Repository.MatchMovesRepository;
 import com.example.chessserverspringboot.websocket.GameSession;
@@ -66,6 +68,8 @@ public class GameDatabaseService {
 
 
 
+    @Autowired
+    private UserProfileRepository profileRepo;
 
     public void finishMatch(int matchId, Integer winnerId, String fen, String reason) {
         Match m = matchRepo.findById(matchId).orElseThrow();
@@ -75,6 +79,28 @@ public class GameDatabaseService {
         m.setFinal_fen(fen);           // итоговая позиция
         m.setEnded_at(LocalDateTime.now()); // время завершения
 
+// id игроков
+        int p1 = m.getPlayer1_id();
+        int p2 = m.getPlayer2_id();
+
+        UserProfile prof1 = profileRepo.findById(p1).orElseThrow();
+        UserProfile prof2 = profileRepo.findById(p2).orElseThrow();
+
+        if (winnerId == null) {
+            // 🤝 ничья — рейтинг не меняем
+        }
+        else if (winnerId.equals(p1)) {
+            prof1.setRating(prof1.getRating() + 30);
+            prof2.setRating(prof2.getRating() - 30);
+        }
+        else if (winnerId.equals(p2)) {
+            prof2.setRating(prof2.getRating() + 30);
+            prof1.setRating(prof1.getRating() - 30);
+        }
+
+        profileRepo.save(prof1);
+        profileRepo.save(prof2);
+        matchRepo.save(m);
 
         matchRepo.save(m);
     }

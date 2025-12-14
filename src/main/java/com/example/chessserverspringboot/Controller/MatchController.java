@@ -2,8 +2,11 @@ package com.example.chessserverspringboot.Controller;
 
 import com.example.chessserverspringboot.Entity.Match;
 import com.example.chessserverspringboot.Entity.MatchMove;
+import com.example.chessserverspringboot.Registration.UserProfile;
+import com.example.chessserverspringboot.Registration.UserProfileRepository;
 import com.example.chessserverspringboot.Repository.MatchMovesRepository;
 import com.example.chessserverspringboot.Repository.MatchRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,12 +15,15 @@ import java.util.List;
 @RequestMapping("/api/matches")
 @CrossOrigin(origins = "*") // позволяет Android подключаться
 public class MatchController {
+    @Autowired
+    private final UserProfileRepository profileRepo;
 
     private final MatchRepository matchRepo;
     private final MatchMovesRepository movesRepo;
 
-    public MatchController(MatchRepository matchRepo,
+    public MatchController(UserProfileRepository profileRepo, MatchRepository matchRepo,
                            MatchMovesRepository movesRepo) {
+        this.profileRepo = profileRepo;
         this.matchRepo = matchRepo;
         this.movesRepo = movesRepo;
     }
@@ -49,8 +55,13 @@ public class MatchController {
         int losses = matchRepo.countLosses(playerId);
         int draws = matchRepo.countDraws(playerId);
 
-        return new PlayerStats(total, wins, losses, draws);
+        UserProfile profile = profileRepo.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+
+        int rating = profile.getRating();
+
+        return new PlayerStats(total, wins, losses, draws, rating);
     }
 
-    public record PlayerStats(int total, int wins, int losses, int draws) {}
+    public record PlayerStats(int total, int wins, int losses, int draws, int rating) {}
 }
