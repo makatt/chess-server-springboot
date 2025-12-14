@@ -5,7 +5,7 @@ public class MessageModel {
     private String type;   // тип сообщения: CONNECT, START, MOVE, END, CHAT
     private String sender; // id или имя игрока
     private String content; // содержимое (например ход, сообщение, состояние доски)
-
+    private String roomId;
     public MessageModel() {}
 
     public MessageModel(String type, String sender, String content) {
@@ -13,6 +13,11 @@ public class MessageModel {
         this.sender = sender;
         this.content = content;
     }
+
+    public String getRoomId() {
+        return roomId;
+    }
+
     public enum MessageType {
         CONNECT,   // подключение игрока
         START,     // начало партии

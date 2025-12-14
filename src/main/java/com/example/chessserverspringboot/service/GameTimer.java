@@ -1,93 +1,117 @@
 package com.example.chessserverspringboot.service;
 
 import com.example.chessserverspringboot.websocket.GameSession;
-import org.springframework.web.socket.TextMessage;
-
-import java.text.DecimalFormat;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class GameTimer {
-    private final Timer timer = new Timer(true);
-    private long whiteTimeMs;
-    private long blackTimeMs;
-    private long lastMoveTime;
-    private String activeColor;
-    private final GameSession session;
-    private final int incrementSec; // ⏱ приращение в секундах
-    private boolean running = true;
 
-    public GameTimer(GameSession session, int minutes, int incrementSec) {
-        this.session = session;
-        this.whiteTimeMs = minutes * 60L * 1000L;
-        this.blackTimeMs = minutes * 60L * 1000L;
-        this.incrementSec = incrementSec;
-        this.activeColor = "white";
-        this.lastMoveTime = System.currentTimeMillis();
-        startTimerLoop();
+    private final GameSession game;
+    private final int minutes;
+    private final int increment;
+
+    private int whiteTimeMs;
+    private int blackTimeMs;
+
+    private boolean whiteToMove = true;
+    private boolean running = false;
+
+    private Thread timerThread;
+
+    public GameTimer(GameSession game, int minutes, int increment) {
+        this.game = game;
+        this.minutes = minutes;
+        this.increment = increment;
+
+        this.whiteTimeMs = minutes * 60 * 1000;
+        this.blackTimeMs = minutes * 60 * 1000;
     }
 
-    public GameTimer(GameSession session, int minutes) {
-        this.session = session;
-        this.whiteTimeMs = minutes * 60L * 1000L;
-        this.blackTimeMs = minutes * 60L * 1000L;
-        this.activeColor = "white";
-        this.incrementSec = 0;
-        this.lastMoveTime = System.currentTimeMillis();
-        startTimerLoop();
+    /* =====================================
+                    GETTERS
+       ===================================== */
+
+    public int getMinutes() {
+        return minutes;
     }
 
-    public synchronized void switchTurn() {
-        long now = System.currentTimeMillis();
-        long elapsed = now - lastMoveTime;
-        if (activeColor.equals("white")) {
-            whiteTimeMs -= elapsed;
-            whiteTimeMs += incrementSec * 1000L; // добавляем инкремент
-        } else {
-            blackTimeMs -= elapsed;
-            blackTimeMs += incrementSec * 1000L;
-        }
-        activeColor = activeColor.equals("white") ? "black" : "white";
-        lastMoveTime = now;
+    public int getIncrement() {
+        return increment;
     }
 
-    private void startTimerLoop() {
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                if (!running) return;
-                long now = System.currentTimeMillis();
-                long elapsed = now - lastMoveTime;
-                if (activeColor.equals("white")) whiteTimeMs -= elapsed;
-                else blackTimeMs -= elapsed;
-                lastMoveTime = now;
+    public int getWhiteTimeMs() {
+        return whiteTimeMs;
+    }
 
-                if (whiteTimeMs <= 0 || blackTimeMs <= 0) {
-                    running = false;
-                    String loser = (whiteTimeMs <= 0) ? "white" : "black";
-                    session.timeExpired(loser);
-                    cancel();
-                    return;
+    public int getBlackTimeMs() {
+        return blackTimeMs;
+    }
+
+    public boolean isWhiteToMove() {
+        return whiteToMove;
+    }
+
+    /* =====================================
+                    TIMER
+       ===================================== */
+
+    public void start() {
+        if (running) return;
+
+        System.out.println(">>> TIMER START");
+
+        running = true;
+
+        timerThread = new Thread(() -> {
+            System.out.println(">>> TIMER THREAD STARTED");
+
+            try {
+                while (running) {
+
+                    Thread.sleep(500); // обновление каждые 500мс
+
+                    if (whiteToMove) {
+                        whiteTimeMs -= 500;
+                        if (whiteTimeMs <= 0) {
+                            running = false;
+                            game.timeExpired("white");
+                        }
+                    } else {
+                        blackTimeMs -= 500;
+                        if (blackTimeMs <= 0) {
+                            running = false;
+                            game.timeExpired("black");
+                        }
+                    }
+
+                    // отправляем обновлённое время игрокам
+                    game.broadcastTimerUpdate(whiteTimeMs, blackTimeMs, whiteToMove);
                 }
 
-                try {
-                    String timeMsg = String.format("white=%s, black=%s",
-                            formatTime(whiteTimeMs), formatTime(blackTimeMs));
-                    session.broadcast(new TextMessage(
-                            "{\"type\":\"TIME_UPDATE\",\"sender\":\"SERVER\",\"content\":\"" + timeMsg + "\"}"
-                    ));
-                } catch (Exception ignored) {}
-            }
-        }, 1000, 1000);
+            } catch (Exception ignored) {}
+        });
+
+        timerThread.start();
     }
 
-    public void stop() { running = false; timer.cancel(); }
+    public void switchTurn() {
+        if (!running) return;
 
-    private String formatTime(long ms) {
-        long seconds = ms / 1000;
-        long minutes = seconds / 60;
-        long sec = seconds % 60;
-        DecimalFormat df = new DecimalFormat("00");
-        return df.format(minutes) + ":" + df.format(sec);
+        // добавляем инкремент тому, кто сделал ход
+        if (whiteToMove) {
+            whiteTimeMs += increment * 1000;
+        } else {
+            blackTimeMs += increment * 1000;
+        }
+
+        whiteToMove = !whiteToMove;
+    }
+
+    public void stop() {
+        running = false;
+
+        if (timerThread != null && timerThread.isAlive()) {
+            try {
+                timerThread.join(100);
+            } catch (Exception ignored) {}
+        }
     }
 }
