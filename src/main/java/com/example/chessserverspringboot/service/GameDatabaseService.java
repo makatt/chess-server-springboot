@@ -31,29 +31,30 @@ public class GameDatabaseService {
 
     @Autowired
     private ObjectMapper mapper;
-
     public void saveMove(int matchId, int playerId, int number, String moveData, String fen) {
         try {
-            // разбиваем "e2-e4"
-            String[] parts = moveData.split("-");
+            // ожидаем формат "e2e4"
+            if (moveData == null || moveData.length() < 4) {
+                throw new IllegalArgumentException("Invalid move format: " + moveData);
+            }
+
+            String from = moveData.substring(0, 2);
+            String to = moveData.substring(2, 4);
 
             // JSON-структура хода
             ObjectNode json = mapper.createObjectNode();
             json.put("moveNumber", number);
             json.put("playerId", playerId);
-            json.put("from", parts[0]);
-            json.put("to", parts[1]);
+            json.put("from", from);
+            json.put("to", to);
             json.put("raw", moveData);
             json.put("timestamp", LocalDateTime.now().toString());
-
 
             MatchMove mv = new MatchMove();
             mv.setMatch_id(matchId);
             mv.setPlayer_id(playerId);
             mv.setMove_number(number);
-            String jsonStr = mapper.writeValueAsString(json);
-            mv.setMove_data(jsonStr);
-
+            mv.setMove_data(mapper.writeValueAsString(json));
             mv.setFen_position(fen);
 
             moveRepo.save(mv);
@@ -65,7 +66,8 @@ public class GameDatabaseService {
 
 
 
-    public void finishMatch(int matchId, int winnerId, String fen, String reason) {
+
+    public void finishMatch(int matchId, Integer winnerId, String fen, String reason) {
         Match m = matchRepo.findById(matchId).orElseThrow();
 
         m.setWinner_id(winnerId);      // победитель

@@ -36,6 +36,15 @@ public class GameSession {
     private final Board board = new Board();
 
 
+    public Integer getMatchId() {
+        return matchId;
+    }
+
+    public void setMatchId(Integer matchId) {
+        this.matchId = matchId;
+    }
+
+
     /* ============================================================
                            CONSTRUCTOR
        ============================================================ */
@@ -53,6 +62,47 @@ public class GameSession {
 
 
         timer.start();
+    }
+    public Board getBoard() {
+        return board;
+    }
+    // ---------- КТО СОПЕРНИК ----------
+    public Player getOpponent(int senderId) {
+        if (Integer.parseInt(white.getName()) == senderId) {
+            return black;
+        }
+        return white;
+    }
+
+    // ---------- ОТПРАВКА ОБОИМ ----------
+    public void sendToAll(MessageModel msg) {
+        try {
+            String json = mapper.writeValueAsString(msg);
+
+            if (white.getSession().isOpen())
+                white.getSession().sendMessage(new TextMessage(json));
+
+            if (black.getSession().isOpen())
+                black.getSession().sendMessage(new TextMessage(json));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ---------- ОТПРАВКА СОПЕРНИКУ ----------
+    public void sendToOpponent(int senderId, MessageModel msg) {
+        Player opponent = getOpponent(senderId);
+
+        try {
+            if (opponent.getSession().isOpen()) {
+                opponent.getSession().sendMessage(
+                        new TextMessage(mapper.writeValueAsString(msg))
+                );
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /* ============================================================
@@ -128,17 +178,29 @@ public class GameSession {
 
         boolean whiteTurn = board.getSideToMove() == Side.WHITE;
 
-
+        //  ход не своей очереди
         if (whiteTurn && player != white) return;
         if (!whiteTurn && player != black) return;
 
+        Move move;
+
         try {
-            Move move = new Move(
-                    Square.fromValue(moveStr.substring(0, 2).toUpperCase()),
-                    Square.fromValue(moveStr.substring(2, 4).toUpperCase())
-            );
+            // ожидаем формат "e2e4"
+            if (moveStr == null || moveStr.length() != 4) {
+                safeSend(player, new MessageModel(
+                        "ERROR",
+                        "SERVER",
+                        "BAD_MOVE_FORMAT"
+                ));
+                return;
+            }
 
+            Square from = Square.fromValue(moveStr.substring(0, 2).toUpperCase());
+            Square to = Square.fromValue(moveStr.substring(2, 4).toUpperCase());
 
+            move = new Move(from, to);
+
+            //  нелегальный ход
             if (!board.isMoveLegal(move, true)) {
                 safeSend(player, new MessageModel(
                         "ERROR",
@@ -148,9 +210,11 @@ public class GameSession {
                 return;
             }
 
+            //  применяем ход
             board.doMove(move);
             timer.switchTurn();
 
+            //  сохраняем ход
             gameDB.saveMove(
                     matchId,
                     Integer.parseInt(player.getName()),
@@ -159,18 +223,63 @@ public class GameSession {
                     board.getFen()
             );
 
+            //  обновляем доску у обоих игроков
             sendUpdate(board.getFen());
-            System.out.println("MOVE RECEIVED: " + move);
 
-            // 🏁 конец игры
-            if (board.isMated() || board.isDraw()) {
+            System.out.println("♟ MOVE OK: " + moveStr);
+
+            // ===============================
+            //  ПРОВЕРКА КОНЦА ИГРЫ
+            // ===============================
+
+            //  МАТ
+            if (board.isMated()) {
                 finished.set(true);
                 timer.stop();
+
+                Player winner = board.getSideToMove() == Side.WHITE ? black : white;
+
+                gameDB.finishMatch(
+                        matchId,
+                        Integer.parseInt(winner.getName()),
+                        board.getFen(),
+                        "checkmate"
+                );
 
                 safeBroadcast(new MessageModel(
                         "GAME_OVER",
                         "SERVER",
-                        board.isMated() ? "checkmate" : "draw"
+                        "checkmate"
+                ));
+                return;
+            }
+
+            //  НИЧЬЯ (пат, повтор, 50 ходов и т.п.)
+            if (board.isDraw()) {
+                finished.set(true);
+                timer.stop();
+
+                gameDB.finishMatch(
+                        matchId,
+                        null,
+                        board.getFen(),
+                        "draw"
+                );
+
+                safeBroadcast(new MessageModel(
+                        "GAME_OVER",
+                        "SERVER",
+                        "draw"
+                ));
+                return;
+            }
+
+            // ⚠️ ШАХ (информационно)
+            if (board.isKingAttacked()) {
+                safeBroadcast(new MessageModel(
+                        "CHECK",
+                        "SERVER",
+                        board.getSideToMove() == Side.WHITE ? "white" : "black"
                 ));
             }
 
@@ -183,6 +292,8 @@ public class GameSession {
             ));
         }
     }
+
+
 
 
 

@@ -155,6 +155,89 @@ public class ChessWebSocketHandler extends TextWebSocketHandler {
                 game.handleMove(senderPlayer, move);
             }
 
+            /* ====================================================
+                   ПРЕДЛОЖЕНИЕ НИЧЬЕЙ
+   ==================================================== */
+            case "DRAW_OFFER" -> {
+
+                String roomId = msg.getRoomId();
+                GameSession game = matchmaker.getGameByRoomId(roomId);
+
+                if (game == null) return;
+
+                // просто уведомляем второго игрока
+                game.sendToOpponent(senderId,
+                        new MessageModel("DRAW_OFFER", "SERVER", "offer"));
+            }
+
+            case "DRAW_DECLINE" -> {
+
+                String roomId = msg.getRoomId();
+                GameSession game = matchmaker.getGameByRoomId(roomId);
+
+                if (game == null) return;
+
+                game.sendToOpponent(senderId,
+                        new MessageModel("DRAW_DECLINE", "SERVER", "declined"));
+            }
+
+
+            case "DRAW_ACCEPT" -> {
+
+                String roomId = msg.getRoomId();
+                GameSession game = matchmaker.getGameByRoomId(roomId);
+
+                if (game == null) return;
+
+                // сохраняем в БД
+                gameDB.finishMatch(
+                        game.getMatchId(),
+                        null,
+                        game.getBoard().getFen(),// winner = null
+                        "DRAW"
+                );
+
+                game.sendToAll(new MessageModel(
+                        "GAME_OVER",
+                        "SERVER",
+                        "DRAW"
+                ));
+
+                matchmaker.finishGame(roomId);
+            }
+
+/* ====================================================
+                      СДАЧА
+   ==================================================== */
+            case "RESIGN" -> {
+
+                String roomId = msg.getRoomId();
+                GameSession game = matchmaker.getGameByRoomId(roomId);
+
+                if (game == null) return;
+
+                int winnerId = Integer.parseInt(
+                        game.getOpponent(senderId).getName()
+                );
+
+
+                // сохраняем в БД
+                gameDB.finishMatch(
+                        game.getMatchId(),
+                        winnerId,
+                        game.getBoard().getFen(),
+                        "RESIGN"
+
+                );
+
+                game.sendToAll(new MessageModel(
+                        "GAME_OVER",
+                        "SERVER",
+                        "RESIGN"
+                ));
+
+                matchmaker.finishGame(roomId);
+            }
 
 
 

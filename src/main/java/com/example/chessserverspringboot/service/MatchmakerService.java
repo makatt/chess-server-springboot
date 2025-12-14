@@ -152,6 +152,7 @@ public class MatchmakerService {
         int matchId = gameDB.createMatch(
                 Integer.parseInt(white.getName()),
                 Integer.parseInt(black.getName())
+
         );
 
         session.setMatchId(matchId);
@@ -192,4 +193,10 @@ public class MatchmakerService {
             game.onPlayerDisconnected(playerName);
         }
     }
+
+    public void finishGame(String roomId) {
+        activeGames.remove(roomId);
+    }
+
+
 }
