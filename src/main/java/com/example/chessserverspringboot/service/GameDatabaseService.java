@@ -87,7 +87,7 @@ public class GameDatabaseService {
         UserProfile prof2 = profileRepo.findById(p2).orElseThrow();
 
         if (winnerId == null) {
-            // 🤝 ничья — рейтинг не меняем
+
         }
         else if (winnerId.equals(p1)) {
             prof1.setRating(prof1.getRating() + 30);

@@ -13,7 +13,7 @@ public class UserProfile {
     private String avatar_url;
     private String bio;
 
-    private Integer rating;
+    private Integer rating = 1000;
     private Integer games_played = 0;
     private Integer games_won = 0;
     private Integer games_lost = 0;
