@@ -66,6 +66,27 @@ curl -fsS http://127.0.0.1:8080/actuator/health
 * Swagger UI: <http://127.0.0.1:8080/swagger-ui.html>
 * Проверка состояния: `docker compose ps` (все сервисы `healthy`), `make verify`
 
+![Swagger UI поверх nginx](screenshots/swagger-ui.png)
+
+```
+NAME                 IMAGE                STATUS                   PORTS
+chess-server-app     chess-server:local   Up 3 minutes (healthy)   8080/tcp
+chess-server-db      postgres:16-alpine   Up 3 minutes (healthy)   5432/tcp
+chess-server-nginx   nginx:1.27-alpine    Up 3 minutes (healthy)   127.0.0.1:8080->80/tcp
+```
+
+## Что проверено руками
+
+| Проверка | Команда | Результат |
+|---|---|---|
+| юнит/интеграционные тесты | `./mvnw verify` | 3 теста, 0 падений (Testcontainers поднимает `postgres:16-alpine` и применяет `01_schema.sql`) |
+| сборка образа | `docker compose up -d --build` | `chess-server:local`, 499 МБ |
+| все контейнеры живые | `docker compose ps` | app / db / nginx — `healthy` |
+| проба через nginx | `curl /healthz`, `curl /actuator/health` | `200 ok`, `{"status":"UP"}` |
+| регистрация → логин → статистика | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/matches/player/1/stats` | `200`, `user_id: 1`, `{"total":0,"rating":1000}` |
+| WebSocket через nginx | `curl` с заголовками `Upgrade: websocket` на `/chess` | `101 Switching Protocols` |
+| данные в БД | `psql -c '\dt chess.*'` | 5 таблиц (`users`, `user_profile`, `rooms`, `matches`, `match_moves`) |
+
 ## Эндпоинты
 
 | Метод | Путь | Назначение |
@@ -165,6 +186,10 @@ make logs     # логи всех сервисов
 make ps       # состояние и healthcheck
 make deploy IMAGE=ghcr.io/makatt/chess-server-springboot:sha-<commit>   # тот же скрипт, что в CD
 ```
+
+Для тестов нужен запущенный Docker: Testcontainers сам поднимает `postgres:16-alpine`
+и применяет ту же схему, что и compose. На Docker 29+ API-версия клиента зафиксирована
+в `pom.xml` (`docker.api.version`), иначе docker-java по умолчанию просит устаревшую 1.32.
 
 ---
 
