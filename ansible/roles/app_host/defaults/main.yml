@@ -1,0 +1,39 @@
+---
+# --- пользователь деплоя -----------------------------------------------------
+app_host_deploy_user: deploy
+app_host_deploy_group: "{{ app_host_deploy_user }}"
+# Публичные ключи, которым разрешён SSH под деплой-юзером.
+# Сюда попадает ключ деплоя из GitHub Actions (secrets.DEPLOY_SSH_KEY — приватная часть).
+app_host_ssh_public_keys: []
+app_host_sudo_nopasswd: false   # деплой-юзеру sudo не нужен: работает с docker
+
+# --- docker ------------------------------------------------------------------
+app_host_docker_packages:
+  - docker.io
+  - docker-compose-v2
+# Кого добавить в группу docker (доступ к сокету = права root на хосте, осознанно).
+app_host_docker_users:
+  - "{{ app_host_deploy_user }}"
+
+# --- приложение --------------------------------------------------------------
+app_host_app_dir: /opt/chess-server
+app_host_repo_url: https://github.com/makatt/chess-server-springboot.git
+app_host_repo_version: main
+app_host_http_port: 8080                 # порт, который публикует nginx из compose
+app_host_image: chess-server:local          # базовый образ; релизы подставляет CD
+app_host_postgres_db: chess
+app_host_postgres_user: chess
+app_host_install_systemd_unit: true
+app_host_start_stack: false              # поднимать стек сразу после провижининга
+
+# --- хостовый nginx (по умолчанию выключен: в compose свой nginx) ------------
+app_host_install_nginx: false
+app_host_server_name: chess-server.local
+
+# --- firewall (по умолчанию выключен: включаем только на чистом сервере) -----
+app_host_manage_firewall: false
+app_host_firewall_allowed_tcp:
+  - 22
+app_host_firewall_allow_http: false
+app_host_firewall_allow_tailscale: true
+app_host_firewall_tailscale_interface: tailscale0

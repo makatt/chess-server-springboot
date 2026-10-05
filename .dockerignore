@@ -1,0 +1,22 @@
+# Всё, что не нужно для сборки jar — не попадает в build context (быстрее сборка,
+# меньше риск утащить секреты внутрь образа).
+.git
+.github
+.idea
+.vscode
+*.iml
+target
+*.md
+LICENSE
+Makefile
+docker-compose*.yml
+docker
+ansible
+screenshots
+docs
+.env
+.env.*
+!.env.example
+mvnw
+mvnw.cmd
+.mvn

@@ -1,0 +1,66 @@
+name: CD
+
+# Деплой на домашний сервер mks по SSH через Tailscale-туннель.
+# Запускается автоматически после успешного CI на main; вручную — по кнопке.
+#
+# Требуются (Settings -> Secrets and variables -> Actions):
+#   secrets.TS_OAUTH_CLIENT_ID / secrets.TS_OAUTH_SECRET  — OAuth-клиент Tailscale (tag:ci)
+#   secrets.DEPLOY_SSH_KEY                                — приватный ключ деплоя
+#   vars.DEPLOY_HOST / vars.DEPLOY_USER / vars.DEPLOY_DIR — адрес в tailnet, юзер, каталог
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-mks
+  cancel-in-progress: false
+
+env:
+  APP_IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  deploy:
+    name: Deploy to mks
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Connect to tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=accept-new \
+              "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}" \
+              "APP_DIR='${{ vars.DEPLOY_DIR }}' bash -s -- '${{ env.APP_IMAGE }}'" \
+              < scripts/deploy.sh
+
+      - name: Verify (через tailnet)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+              "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}" \
+              "curl -fsS http://127.0.0.1:8080/actuator/health && docker compose -f '${{ vars.DEPLOY_DIR }}/docker-compose.yml' ps"

@@ -4,6 +4,14 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Секреты и локальная инфраструктура ###
+.env
+.env.local
+docker-compose.override.yml
+screenshots/raw/
+ansible/inventory.ini
+ansible/.secrets/
+
 ### STS ###
 .apt_generated
 .classpath

@@ -1,0 +1,37 @@
+---
+# Хостовый nginx нужен только если вход во внешний мир идёт через него
+# (свой сертификат, отдельный домен). По умолчанию в стеке уже есть nginx.
+- name: Установить nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Виртуальный хост chess-server-springboot
+  ansible.builtin.template:
+    src: nginx-app.conf.j2
+    dest: /etc/nginx/sites-available/chess-server-springboot.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Перечитать nginx
+
+- name: Включить сайт
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/chess-server-springboot.conf
+    dest: /etc/nginx/sites-enabled/chess-server-springboot.conf
+    state: link
+  notify: Перечитать nginx
+
+- name: Убрать дефолтный сайт (чтобы не перехватывал трафик)
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Перечитать nginx
+
+- name: nginx включён и запущен
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true

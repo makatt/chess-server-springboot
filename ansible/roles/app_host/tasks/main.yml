@@ -1,0 +1,22 @@
+---
+- name: Пользователь деплоя
+  ansible.builtin.import_tasks: user.yml
+  tags: [user]
+
+- name: Docker и compose-плагин
+  ansible.builtin.import_tasks: docker.yml
+  tags: [docker]
+
+- name: Каталог приложения, .env и systemd-юнит
+  ansible.builtin.import_tasks: app_dir.yml
+  tags: [app]
+
+- name: Хостовый nginx
+  ansible.builtin.import_tasks: nginx.yml
+  when: app_host_install_nginx | bool
+  tags: [nginx]
+
+- name: Firewall
+  ansible.builtin.import_tasks: firewall.yml
+  when: app_host_manage_firewall | bool
+  tags: [firewall]

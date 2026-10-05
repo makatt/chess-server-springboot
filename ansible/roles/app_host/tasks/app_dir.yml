@@ -1,0 +1,70 @@
+---
+- name: Проверить наличие git
+  ansible.builtin.stat:
+    path: /usr/bin/git
+  register: app_host_git_bin
+
+- name: Установить git
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: not app_host_git_bin.stat.exists
+
+- name: Каталог приложения
+  ansible.builtin.file:
+    path: "{{ app_host_app_dir }}"
+    state: directory
+    owner: "{{ app_host_deploy_user }}"
+    group: "{{ app_host_deploy_group }}"
+    mode: "0755"
+
+- name: Рабочая копия репозитория (её же обновляет CD-пайплайн)
+  ansible.builtin.git:
+    repo: "{{ app_host_repo_url }}"
+    dest: "{{ app_host_app_dir }}"
+    version: "{{ app_host_repo_version }}"
+    update: true
+    accept_hostkey: true
+  become: true
+  become_user: "{{ app_host_deploy_user }}"
+
+- name: Файл окружения с паролем БД (создаётся один раз, не перезаписывается)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_host_app_dir }}/.env"
+    owner: "{{ app_host_deploy_user }}"
+    group: "{{ app_host_deploy_group }}"
+    mode: "0600"
+    force: false
+  no_log: true
+
+- name: systemd-юнит стека (поднимает контейнеры после перезагрузки)
+  ansible.builtin.template:
+    src: chess-server.service.j2
+    dest: /etc/systemd/system/chess-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: app_host_install_systemd_unit | bool
+  register: app_host_unit
+
+- name: Перечитать systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: app_host_unit is changed
+
+- name: Включить юнит в автозапуск
+  ansible.builtin.systemd_service:
+    name: chess-server.service
+    enabled: true
+  when: app_host_install_systemd_unit | bool
+
+- name: Поднять стек сразу после провижининга
+  ansible.builtin.systemd_service:
+    name: chess-server.service
+    state: started
+  when:
+    - app_host_install_systemd_unit | bool
+    - app_host_start_stack | bool
