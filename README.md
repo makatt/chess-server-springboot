@@ -119,7 +119,7 @@ chess-server-nginx   nginx:1.27-alpine    Up 3 minutes (healthy)   127.0.0.1:808
 
 ## CD (`.github/workflows/cd.yml`)
 
-Запускается после успешного CI на `main` (или вручную): подключается к tailnet,
+Запускается после успешного CI на `master` (или вручную): подключается к tailnet,
 заходит по SSH и выполняет `scripts/deploy.sh <образ>` — обновляет рабочую копию,
 `docker compose pull`, перезапуск, ожидание health-пробы через nginx. Не поднялся —
 джоб падает вместе с логами контейнера.
