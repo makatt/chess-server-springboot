@@ -3,8 +3,10 @@ package com.example.chessserverspringboot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * обычный @SpringBootTest без БД).
  */
 class AuthFlowTests extends AbstractIntegrationTest {
+
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {
+            };
 
     @Autowired
     private TestRestTemplate rest;
@@ -45,17 +51,17 @@ class AuthFlowTests extends AbstractIntegrationTest {
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         // 3. Логин возвращает user_id
-        ResponseEntity<Map> loggedIn = post("/api/auth/login", Map.of(
+        ResponseEntity<Map<String, Object>> loggedIn = postJson("/api/auth/login", Map.of(
                 "username", username,
-                "password", password), Map.class);
+                "password", password));
         assertThat(loggedIn.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(loggedIn.getBody()).containsKey("user_id");
 
-        int userId = (int) loggedIn.getBody().get("user_id");
+        int userId = ((Number) loggedIn.getBody().get("user_id")).intValue();
 
         // 4. Статистика игрока читается из chess.matches / chess.user_profile
-        ResponseEntity<Map> stats = rest.getForEntity(
-                "/api/matches/player/" + userId + "/stats", Map.class);
+        ResponseEntity<Map<String, Object>> stats = rest.exchange(
+                "/api/matches/player/" + userId + "/stats", HttpMethod.GET, null, JSON_OBJECT);
         assertThat(stats.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(stats.getBody()).containsEntry("total", 0);
         assertThat(stats.getBody()).containsEntry("rating", 1000);
@@ -63,18 +69,21 @@ class AuthFlowTests extends AbstractIntegrationTest {
 
     @Test
     void actuatorHealthIsUp() {
-        ResponseEntity<Map> health = rest.getForEntity("/actuator/health", Map.class);
+        ResponseEntity<Map<String, Object>> health = rest.exchange(
+                "/actuator/health", HttpMethod.GET, null, JSON_OBJECT);
         assertThat(health.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(health.getBody()).containsEntry("status", "UP");
     }
 
     private ResponseEntity<String> post(String path, Map<String, String> body) {
-        return post(path, body, String.class);
-    }
-
-    private <T> ResponseEntity<T> post(String path, Map<String, String> body, Class<T> type) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        return rest.postForEntity(path, new HttpEntity<>(body, headers), type);
+        return rest.postForEntity(path, new HttpEntity<>(body, headers), String.class);
+    }
+
+    private ResponseEntity<Map<String, Object>> postJson(String path, Map<String, String> body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(body, headers), JSON_OBJECT);
     }
 }
