@@ -1,0 +1,48 @@
+---
+- name: Проверить, установлен ли docker
+  ansible.builtin.stat:
+    path: /usr/bin/docker
+  register: app_host_docker_bin
+
+- name: Установить docker и compose-плагин
+  ansible.builtin.apt:
+    name: "{{ app_host_docker_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: not app_host_docker_bin.stat.exists
+  register: app_host_docker_installed
+
+- name: Сервис docker включён и запущен
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Добавить пользователей в группу docker
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ app_host_docker_users }}"
+  register: app_host_docker_group_change
+  notify: Перезапустить docker
+
+- name: Проверить, что пользователь деплоя видит docker compose
+  ansible.builtin.command:
+    cmd: docker compose version
+  become: true
+  become_user: "{{ app_host_deploy_user }}"
+  changed_when: false
+
+- name: Проверить, что пользователь деплоя может обратиться к docker API
+  ansible.builtin.command:
+    cmd: docker info --format '{{ "{{" }}.ServerVersion{{ "}}" }}'
+  become: true
+  become_user: "{{ app_host_deploy_user }}"
+  changed_when: false
+  register: app_host_docker_info
+
+- name: Версия docker на хосте
+  ansible.builtin.debug:
+    msg: "docker server: {{ app_host_docker_info.stdout }}"

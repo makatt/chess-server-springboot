@@ -1,0 +1,47 @@
+---
+# Осторожно: включение firewall меняет сетевой доступ на хосте.
+# Политика — deny by default, разрешаем только SSH, при необходимости HTTP и tailnet.
+- name: Установить ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: "Политика по умолчанию: входящий трафик запрещён"
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: "Политика по умолчанию: исходящий трафик разрешён"
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Разрешить SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: chess-server-springboot ssh
+  loop: "{{ app_host_firewall_allowed_tcp }}"
+
+- name: Разрешить HTTP
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    comment: chess-server-springboot http
+  when: app_host_firewall_allow_http | bool
+
+- name: Пускать весь трафик из tailnet
+  community.general.ufw:
+    rule: allow
+    interface: "{{ app_host_firewall_tailscale_interface }}"
+    direction: in
+    comment: chess-server-springboot tailscale
+  when: app_host_firewall_allow_tailscale | bool
+
+- name: Включить firewall
+  community.general.ufw:
+    state: enabled

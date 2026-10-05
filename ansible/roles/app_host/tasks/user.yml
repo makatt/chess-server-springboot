@@ -1,0 +1,38 @@
+---
+- name: Группа деплоя
+  ansible.builtin.group:
+    name: "{{ app_host_deploy_group }}"
+    state: present
+
+- name: Пользователь деплоя
+  ansible.builtin.user:
+    name: "{{ app_host_deploy_user }}"
+    group: "{{ app_host_deploy_group }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: SSH-ключи деплоя (ключ из GitHub Actions)
+  ansible.builtin.authorized_key:
+    user: "{{ app_host_deploy_user }}"
+    key: "{{ item }}"
+    state: present
+    exclusive: false
+  loop: "{{ app_host_ssh_public_keys }}"
+  no_log: true
+
+- name: Sudo без пароля (только если явно попросили)
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ app_host_deploy_user }}"
+    content: "{{ app_host_deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when: app_host_sudo_nopasswd | bool
+
+- name: Удалить sudo-правило, если оно больше не нужно
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/90-{{ app_host_deploy_user }}"
+    state: absent
+  when: not (app_host_sudo_nopasswd | bool)

@@ -1,0 +1,88 @@
+# =============================================================================
+#  chess-server-springboot — локальный/prod-стек: nginx -> app (Spring Boot) -> postgres
+#  Запуск:  cp .env.example .env  &&  docker compose up -d --build
+#  Наружу публикуется ТОЛЬКО nginx и только на 127.0.0.1:${HTTP_PORT}
+#  (БД и приложение доступны исключительно внутри compose-сети backend).
+# =============================================================================
+name: chess-server
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: chess-server-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chess}
+      POSTGRES_USER: ${POSTGRES_USER:-chess}
+      # пароль обязателен: без него compose падает сразу (fail closed)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — create .env from .env.example}
+      # чтобы init-скрипт создавал схему chess, а не только public
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # init-скрипты выполняются один раз, при инициализации пустого volume
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend
+
+  app:
+    # build для `docker compose up --build`; APP_IMAGE позволяет подставить
+    # готовый образ из GHCR при деплое (см. scripts/deploy.sh)
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${APP_IMAGE:-chess-server:local}
+    container_name: chess-server-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-chess}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-chess}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — create .env from .env.example}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_JPA_SHOW_SQL: "false"
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: chess-server-nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      # только loopback: внешний доступ — через reverse proxy хостера/Tailscale
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+volumes:
+  db_data:
+    name: chess-server-db-data
+
+networks:
+  backend:
+    driver: bridge
