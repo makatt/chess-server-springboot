@@ -12,6 +12,12 @@ set -Eeuo pipefail
 
 IMAGE="${1:?usage: deploy.sh <image-ref>}"
 APP_DIR="${APP_DIR:-$HOME/apps/chess-server}"
+# Ветка, за которой следует хост. По умолчанию — дефолтная ветка origin,
+# иначе master (переопределяется: APP_BRANCH=main scripts/deploy.sh <image>)
+if [[ -z "${APP_BRANCH:-}" ]]; then
+  APP_BRANCH="$(git -C "$APP_DIR" rev-parse --abbrev-ref origin/HEAD 2>/dev/null | cut -d/ -f2- || true)"
+  APP_BRANCH="${APP_BRANCH:-master}"
+fi
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8080/healthz}"
 APP_HEALTH_URL="${APP_HEALTH_URL:-http://127.0.0.1:8080/actuator/health}"
 TIMEOUT="${TIMEOUT:-180}"
@@ -28,13 +34,18 @@ docker compose version >/dev/null 2>&1 || fail "плагин docker compose не
 
 cd "$APP_DIR"
 
-log "обновляю рабочую копию репозитория ($APP_DIR)"
+log "обновляю рабочую копию репозитория ($APP_DIR, ветка $APP_BRANCH)"
 git fetch --prune origin
-git reset --hard origin/main
+git reset --hard "origin/$APP_BRANCH"
 
 export APP_IMAGE="$IMAGE"
-log "тяну образ $IMAGE"
-docker compose pull app
+if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  log "образ $IMAGE уже в локальном кэше — pull не нужен"
+else
+  log "тяну образ $IMAGE из реестра"
+  # строго: не смогли скачать образ — деплой падает, старый контейнер не трогаем
+  docker compose pull app
+fi
 
 log "применяю стек"
 docker compose up -d --remove-orphans
