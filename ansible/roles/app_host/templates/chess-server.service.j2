@@ -1,0 +1,18 @@
+[Unit]
+Description=chess-server-springboot (docker compose stack: nginx + app + postgres)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ app_host_app_dir }}
+User={{ app_host_deploy_user }}
+EnvironmentFile={{ app_host_app_dir }}/.env
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

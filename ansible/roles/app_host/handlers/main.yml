@@ -1,0 +1,15 @@
+---
+- name: Перезапустить docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+
+- name: Проверить конфигурацию nginx
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+
+- name: Перечитать nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

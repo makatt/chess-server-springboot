@@ -1,0 +1,30 @@
+---
+# =============================================================================
+#  Роль app_host — приведение чистого хоста (VPS/домашний сервер) к состоянию,
+#  в котором репозиторий chess-server-springboot можно деплоить:
+#    * пользователь деплоя + SSH-ключи из CI;
+#    * docker + compose-плагин, пользователь в группе docker;
+#    * каталог приложения из git + .env со сгенерированным паролем;
+#    * systemd-юнит, поднимающий стек после перезагрузки;
+#    * опционально: хостовый nginx и firewall (по умолчанию выключены).
+# =============================================================================
+- name: Подготовка хоста для chess-server-springboot
+  hosts: app_hosts
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Проверить, что переменные заданы осмысленно
+      ansible.builtin.assert:
+        that:
+          - app_host_deploy_user | length > 0
+          - app_host_app_dir is match('^/')
+          - app_host_ssh_public_keys | length > 0
+        fail_msg: >-
+          Задайте app_host_deploy_user, app_host_app_dir и app_host_ssh_public_keys
+          (ключ деплоя из GitHub Actions).
+        quiet: true
+      tags: [always]
+
+  roles:
+    - role: app_host

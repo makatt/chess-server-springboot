@@ -28,6 +28,10 @@
     </scm>
     <properties>
         <java.version>17</java.version>
+        <!-- API-версия docker-клиента для Testcontainers: docker-java по умолчанию
+             объявляет 1.32, а Docker 29+ требует минимум 1.44.
+             Переопределяется при необходимости: ./mvnw verify -Ddocker.api.version=1.43 -->
+        <docker.api.version>1.44</docker.api.version>
     </properties>
     <dependencies>
         <!-- Базовый веб -->
@@ -86,6 +90,31 @@
             <version>3.7.0</version>
         </dependency>
 
+        <!-- Actuator: /actuator/health/* используется в Docker HEALTHCHECK,
+             healthcheck-ах docker-compose и при проверке деплоя -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Интеграционные тесты на реальном PostgreSQL (Testcontainers);
+             версии приходят из spring-boot-dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
     <repositories>
         <repository>
@@ -99,6 +128,16 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- см. свойство docker.api.version в <properties> -->
+                    <systemPropertyVariables>
+                        <api.version>${docker.api.version}</api.version>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>
