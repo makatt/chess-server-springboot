@@ -37,6 +37,9 @@ ps: ## состояние контейнеров и healthcheck
 test: ## интеграционные тесты (Testcontainers поднимет postgres сам)
 	./mvnw -B -ntp verify
 
+smoke: ## смоук-тест поднятого стенда: контейнеры, API, WebSocket, БД
+	bash scripts/smoke-test.sh $(BASE_URL)
+
 verify: ## проверить, что сервис отвечает через nginx
 	@curl -fsS http://127.0.0.1:$${HTTP_PORT:-8080}/actuator/health && echo
 
